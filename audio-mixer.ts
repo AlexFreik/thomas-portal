@@ -1,3 +1,37 @@
+/*
+
+    ===== VIDEO ELEMENT =====
+            │
+            ▼
+    createMediaElementSource
+            │
+            ▼
+        videoGain ← video channel
+        │     │
+        │     └────────► headphoneGain → headphoneDest → headphones device
+        ▼
+    masterGain
+        │
+        ▼
+    masterAnalyser
+        │
+        ▼
+    masterDest
+        │
+        ▼
+    masterAudio → speaker device
+
+
+    ===== MIC INPUT =====
+            │
+            ▼
+        micSource → micGain → micAnalyser
+                                    │
+                                    ├→ headphoneGain → ...
+                                    ▼
+                                    masterGain → ...
+    */
+
 export class AudioMixer {
     private ctx: AudioContext;
 
@@ -7,8 +41,9 @@ export class AudioMixer {
     private masterDest: MediaStreamAudioDestinationNode;
     private headphoneDest: MediaStreamAudioDestinationNode;
 
-    private masterGain: GainNode;
     private micGain: GainNode;
+    private videoGain: GainNode;
+    private masterGain: GainNode;
     private headphoneGain: GainNode;
 
     private micAnalyser: AnalyserNode;
@@ -22,11 +57,14 @@ export class AudioMixer {
     constructor() {
         this.ctx = new AudioContext();
 
-        this.masterGain = this.ctx.createGain();
-        this.masterGain.gain.value = 1;
-
         this.micGain = this.ctx.createGain();
         this.micGain.gain.value = 0;
+
+        this.videoGain = this.ctx.createGain();
+        this.videoGain.gain.value = 1;
+
+        this.masterGain = this.ctx.createGain();
+        this.masterGain.gain.value = 1;
 
         this.headphoneGain = this.ctx.createGain();
         this.headphoneGain.gain.value = 1;
@@ -55,22 +93,24 @@ export class AudioMixer {
         this.masterAudio.play().catch(() => {});
         this.headphoneAudio.play().catch(() => {});
 
-        // master chain
+        this.micGain.connect(this.micAnalyser);
+        this.micAnalyser.connect(this.masterGain);
+
+        this.videoGain.connect(this.masterGain);
+        this.videoGain.connect(this.headphoneGain);
+
         this.masterGain.connect(this.masterAnalyser);
         this.masterAnalyser.connect(this.masterDest);
         this.headphoneGain.connect(this.headphoneDest);
     }
 
     attachMediaElement(el: HTMLMediaElement) {
-        if (this.videoSource) return;
-
+        if (this.videoSource) {
+            console.error('Player already attached.');
+            return;
+        }
         this.videoSource = this.ctx.createMediaElementSource(el);
-
-        // send video to headphones
-        this.videoSource.connect(this.headphoneGain);
-
-        // send video to master
-        this.videoSource.connect(this.masterGain);
+        this.videoSource.connect(this.videoGain);
     }
 
     async startMic(deviceId: string) {
@@ -81,8 +121,6 @@ export class AudioMixer {
         this.micSource = this.ctx.createMediaStreamSource(stream);
 
         this.micSource.connect(this.micGain);
-        this.micGain.connect(this.micAnalyser);
-        this.micAnalyser.connect(this.masterGain);
     }
 
     muteMic() {
@@ -131,12 +169,12 @@ export class AudioMixer {
         if (audio.setSinkId && deviceId !== 'none') await audio.setSinkId(deviceId);
     }
 
-    getMicAnalyser() {
-        return this.micAnalyser;
+    getMicLevel() {
+        return this.getAudioLevel(this.micAnalyser);
     }
 
-    getMasterAnalyser() {
-        return this.masterAnalyser;
+    getMasterLevel() {
+        return this.getAudioLevel(this.masterAnalyser);
     }
 
     async listDevices() {
