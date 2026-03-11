@@ -1,4 +1,4 @@
-import { AudioMixer } from './audio-mixer.js';
+import { AudioMixer, drawDbMeter } from './audio-mixer.js';
 const mixer = new AudioMixer();
 const player = document.getElementById('player');
 mixer.attachMediaElement(player);
@@ -98,8 +98,12 @@ videoBtn.onclick = async () => {
 function updateMeters() {
     const micLevel = mixer.getMicLevel();
     const masterLevel = mixer.getMasterLevel();
+    const canvas = document.querySelector('#master-meter');
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, 100, 100);
+    drawDbMeter(ctx, 0, masterLevel, false);
+    drawDbMeter(ctx, 52, masterLevel, false);
     document.getElementById('micMeter').value = micLevel;
-    document.getElementById('masterMeter').value = masterLevel;
     requestAnimationFrame(updateMeters);
 }
 document.body.addEventListener('click', () => {

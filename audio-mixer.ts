@@ -25,11 +25,11 @@
     ===== MIC INPUT =====
             │
             ▼
-        micSource → micGain → micAnalyser
-                                    │
-                                    ├→ headphoneGain → ...
-                                    ▼
-                                    masterGain → ...
+        micSource → stereoMic → micGain → micAnalyser
+                                            │
+                                            ├→ headphoneGain → ...
+                                            ▼
+                                            masterGain → ...
     */
 
 export class AudioMixer {
@@ -37,6 +37,7 @@ export class AudioMixer {
 
     private videoSource?: MediaElementAudioSourceNode;
     private micSource?: MediaStreamAudioSourceNode;
+    private stereoMic?: ChannelMergerNode;
 
     private masterDest: MediaStreamAudioDestinationNode;
     private headphoneDest: MediaStreamAudioDestinationNode;
@@ -119,8 +120,8 @@ export class AudioMixer {
         });
 
         this.micSource = this.ctx.createMediaStreamSource(stream);
-
-        this.micSource.connect(this.micGain);
+        this.stereoMic = forceMonoToStereo(this.ctx, this.micSource);
+        this.stereoMic.connect(this.micGain);
     }
 
     muteMic() {
@@ -221,4 +222,64 @@ export class AudioMixer {
             } catch {}
         }
     }
+}
+
+function forceMonoToStereo(audioContext: AudioContext, sourceNode: AudioNode) {
+    const splitter = audioContext.createChannelSplitter(2);
+    const merger = audioContext.createChannelMerger(2);
+
+    sourceNode.connect(splitter);
+
+    // duplicate channel 0 to L and R
+    splitter.connect(merger, 0, 0);
+    splitter.connect(merger, 0, 1);
+
+    return merger;
+}
+
+// =====
+// ===== Audio Meter =====
+// =====
+
+// Draw the segmented dB meter with peak indicator
+export function drawDbMeter(
+    ctx: CanvasRenderingContext2D,
+    xOffset: number,
+    volume: number,
+    muted: boolean,
+) {
+    const dB = Math.max(-100, Math.min(0, Math.log10(volume) * 20));
+    const canvasHeight = 100;
+
+    // Define dB ranges and colors
+    const dbRanges = [
+        { min: -100, max: -90, frac: 0.07, colorOn: '#008000', colorOff: '#008080' },
+        { min: -90, max: -36, frac: 0.28, colorOn: '#008000', colorOff: '#008080' },
+        { min: -36, max: -18, frac: 0.25, colorOn: '#00c000', colorOff: '#00c0c0' },
+        { min: -18, max: -6, frac: 0.25, colorOn: '#00ff00', colorOff: '#00ffff' },
+        { min: -6, max: -1, frac: 0.12, colorOn: '#ffff00', colorOff: '#faff74' },
+        { min: -1, max: 0, frac: 0.03, colorOn: '#ff0000', colorOff: '#ff0000' },
+    ];
+
+    let accumulatedHeight = 0; // Track filled height
+
+    dbRanges.forEach((range) => {
+        if (dB >= range.min) {
+            const rangeHeight = range.frac * canvasHeight;
+
+            // Calculate the portion of this range to be filled
+            const filledFraction = Math.min(dB, range.max) - range.min;
+            const filledHeight = (filledFraction / (range.max - range.min)) * rangeHeight;
+
+            // Draw the segment for this range
+            ctx.fillStyle = muted ? range.colorOff : range.colorOn;
+            ctx.fillRect(
+                xOffset,
+                canvasHeight - accumulatedHeight - filledHeight,
+                50,
+                filledHeight,
+            );
+            accumulatedHeight += rangeHeight;
+        }
+    });
 }
