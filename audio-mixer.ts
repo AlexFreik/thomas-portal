@@ -9,6 +9,7 @@ export class AudioMixer {
 
     private masterGain: GainNode;
     private micGain: GainNode;
+    private headphoneGain: GainNode;
 
     private micAnalyser: AnalyserNode;
     private masterAnalyser: AnalyserNode;
@@ -16,7 +17,7 @@ export class AudioMixer {
     private masterAudio: HTMLAudioElement;
     private headphoneAudio: HTMLAudioElement;
 
-    private micMonitorEnabled = true;
+    private micMonitorEnabled = false;
 
     constructor() {
         this.ctx = new AudioContext();
@@ -26,6 +27,9 @@ export class AudioMixer {
 
         this.micGain = this.ctx.createGain();
         this.micGain.gain.value = 0;
+
+        this.headphoneGain = this.ctx.createGain();
+        this.headphoneGain.gain.value = 1;
 
         this.micAnalyser = this.ctx.createAnalyser();
         this.masterAnalyser = this.ctx.createAnalyser();
@@ -54,6 +58,7 @@ export class AudioMixer {
         // master chain
         this.masterGain.connect(this.masterAnalyser);
         this.masterAnalyser.connect(this.masterDest);
+        this.headphoneGain.connect(this.headphoneDest);
     }
 
     attachMediaElement(el: HTMLMediaElement) {
@@ -62,7 +67,7 @@ export class AudioMixer {
         this.videoSource = this.ctx.createMediaElementSource(el);
 
         // send video to headphones
-        this.videoSource.connect(this.headphoneDest);
+        this.videoSource.connect(this.headphoneGain);
 
         // send video to master
         this.videoSource.connect(this.masterGain);
@@ -78,8 +83,6 @@ export class AudioMixer {
         this.micSource.connect(this.micGain);
         this.micGain.connect(this.micAnalyser);
         this.micAnalyser.connect(this.masterGain);
-        // optional preview in headphones
-        if (this.micMonitorEnabled) this.micAnalyser.connect(this.headphoneDest);
     }
 
     muteMic() {
@@ -96,11 +99,11 @@ export class AudioMixer {
         if (!this.micAnalyser) return;
 
         try {
-            this.micAnalyser.disconnect(this.headphoneDest);
+            this.micAnalyser.disconnect(this.headphoneGain);
         } catch {}
 
         if (enabled) {
-            this.micAnalyser.connect(this.headphoneDest);
+            this.micAnalyser.connect(this.headphoneGain);
         }
     }
 
@@ -112,12 +115,20 @@ export class AudioMixer {
 
     async setMasterSpeaker(deviceId: string) {
         const audio = this.masterAudio as any;
+
+        if (deviceId == 'none') this.masterGain.gain.value = 0;
+        else this.masterGain.gain.value = 1;
+
         if (audio.setSinkId) await audio.setSinkId(deviceId);
     }
 
     async setHeadphones(deviceId: string) {
         const audio = this.headphoneAudio as any;
-        if (audio.setSinkId) await audio.setSinkId(deviceId);
+
+        if (deviceId == 'none') this.masterGain.gain.value = 0;
+        else this.masterGain.gain.value = 1;
+
+        if (audio.setSinkId && deviceId !== 'none') await audio.setSinkId(deviceId);
     }
 
     getMicAnalyser() {
@@ -158,6 +169,18 @@ export class AudioMixer {
     async resume() {
         if (this.ctx.state !== 'running') {
             await this.ctx.resume();
+        }
+
+        if (this.masterAudio.paused) {
+            try {
+                await this.masterAudio.play();
+            } catch {}
+        }
+
+        if (this.headphoneAudio.paused) {
+            try {
+                await this.headphoneAudio.play();
+            } catch {}
         }
     }
 }

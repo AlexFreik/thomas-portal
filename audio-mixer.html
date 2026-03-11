@@ -98,7 +98,10 @@
         }
 
         const selectedHeadphones = localStorage.getItem('selectedHeadphones');
-        if (selectedHeadphones) headphonesSelect.value = selectedHeadphones;
+        if (selectedHeadphones) {
+          headphonesSelect.value = selectedHeadphones;
+          setHeadphones(selectedHeadphones);
+        }
       }
 
       function fill(select, devices, addNone = false) {
@@ -122,6 +125,7 @@
 
       micSelect.onchange = () => setMic(micSelect.value);
       masterSelect.onchange = () => setMasterSpeaker(masterSelect.value);
+      headphonesSelect.onchange = setHeadphones(headphonesSelect.value);
 
       async function setMic(id) {
         if (!id) return;
@@ -135,11 +139,11 @@
         localStorage.setItem('selectedMaster', id);
       }
 
-      headphonesSelect.onchange = () => {
-        const id = headphonesSelect.value;
+      async function setHeadphones(id) {
+        if (!id) return;
+        await mixer.setHeadphones(id);
         localStorage.setItem('selectedHeadphones', id);
-        if (id !== 'none') mixer.setHeadphones(id);
-      };
+      }
 
       cameraBtn.onclick = async () => {
         if (currentCameraStream) currentCameraStream.getTracks().forEach((t) => t.stop());
@@ -155,6 +159,7 @@
 
         player.srcObject = stream;
         player.play();
+        mixer.unmuteMic();
       };
 
       videoBtn.onclick = async () => {
@@ -168,6 +173,7 @@
         });
 
         player.play();
+        mixer.muteMic();
       };
 
       const micMeter = document.getElementById('micMeter');
@@ -200,7 +206,6 @@
       updateMeters();
 
       loadDevices();
-      mixer.unmuteMic();
     </script>
   </body>
 </html>
