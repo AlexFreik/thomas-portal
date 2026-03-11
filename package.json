@@ -1,0 +1,25 @@
+{
+    "name": "thomas-portal",
+    "version": "1.0.0",
+    "description": "",
+    "main": "index.js",
+    "scripts": {
+        "build": "tsc",
+        "watch": "tsc --watch",
+        "serve": "npx serve -l 8000",
+        "pretty": "prettier --write .",
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git@github-2:AlexFreik/thomas-portal.git"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "type": "commonjs",
+    "devDependencies": {
+        "prettier": "^3.8.1",
+        "typescript": "^5.9.3"
+    }
+}

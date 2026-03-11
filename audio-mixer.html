@@ -1,0 +1,206 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Audio Mixer Demo</title>
+
+    <style>
+      body {
+        font-family: sans-serif;
+        padding: 20px;
+      }
+      select {
+        margin-right: 10px;
+      }
+      video {
+        display: block;
+        margin-top: 20px;
+        width: 640px;
+        background: black;
+      }
+      button {
+        margin-top: 10px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <h3>Audio Mixer Demo</h3>
+
+    <div>
+      Camera
+      <select id="camera"></select>
+      <br />
+
+      Mic
+      <select id="mic"></select>
+      <meter id="micMeter" min="0" max="1" value="0"></meter>
+      <br />
+
+      Master Speaker
+      <select id="master"></select>
+      <meter id="masterMeter" min="0" max="1" value="0"></meter>
+      <br />
+
+      Headphones
+      <select id="headphones"></select>
+    </div>
+
+    <video id="player" controls playsinline></video>
+
+    <div>
+      <button id="cameraBtn">Camera</button>
+      <button id="videoBtn">Video</button>
+    </div>
+
+    <script type="module">
+      import { AudioMixer } from './audio-mixer.js';
+
+      const mixer = new AudioMixer();
+
+      const player = document.getElementById('player');
+      mixer.attachMediaElement(player);
+
+      const cameraSelect = document.getElementById('camera');
+      const micSelect = document.getElementById('mic');
+      const masterSelect = document.getElementById('master');
+      const headphonesSelect = document.getElementById('headphones');
+
+      const cameraBtn = document.getElementById('cameraBtn');
+      const videoBtn = document.getElementById('videoBtn');
+
+      let currentCameraStream = null;
+
+      async function loadDevices() {
+        await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+
+        const devices = await navigator.mediaDevices.enumerateDevices();
+
+        const cams = devices.filter((d) => d.kind === 'videoinput');
+        const mics = devices.filter((d) => d.kind === 'audioinput');
+        const outs = devices.filter((d) => d.kind === 'audiooutput');
+
+        fill(cameraSelect, cams);
+        fill(micSelect, mics);
+        fill(masterSelect, outs, true);
+        fill(headphonesSelect, outs, true);
+
+        const selectedMic = localStorage.getItem('selectedMic');
+        if (selectedMic) {
+          micSelect.value = selectedMic;
+          setMic(selectedMic);
+        }
+
+        const selectedMaster = localStorage.getItem('selectedMaster');
+        if (selectedMaster) {
+          masterSelect.value = selectedMaster;
+          setMasterSpeaker(selectedMaster);
+        }
+
+        const selectedHeadphones = localStorage.getItem('selectedHeadphones');
+        if (selectedHeadphones) headphonesSelect.value = selectedHeadphones;
+      }
+
+      function fill(select, devices, addNone = false) {
+        select.innerHTML = '';
+
+        if (addNone) {
+          const opt = document.createElement('option');
+          opt.value = 'none';
+          opt.text = 'None';
+          select.appendChild(opt);
+        }
+
+        devices.forEach((d) => {
+          const opt = document.createElement('option');
+          opt.value = d.deviceId;
+          opt.text = d.label || d.kind;
+
+          select.appendChild(opt);
+        });
+      }
+
+      micSelect.onchange = () => setMic(micSelect.value);
+      masterSelect.onchange = () => setMasterSpeaker(masterSelect.value);
+
+      async function setMic(id) {
+        if (!id) return;
+        await mixer.startMic(id);
+        localStorage.setItem('selectedMic', id);
+      }
+
+      async function setMasterSpeaker(id) {
+        if (!id) return;
+        await mixer.setMasterSpeaker(id);
+        localStorage.setItem('selectedMaster', id);
+      }
+
+      headphonesSelect.onchange = () => {
+        const id = headphonesSelect.value;
+        localStorage.setItem('selectedHeadphones', id);
+        if (id !== 'none') mixer.setHeadphones(id);
+      };
+
+      cameraBtn.onclick = async () => {
+        if (currentCameraStream) currentCameraStream.getTracks().forEach((t) => t.stop());
+
+        const camId = cameraSelect.value;
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { deviceId: camId },
+          audio: false,
+        });
+
+        currentCameraStream = stream;
+
+        player.srcObject = stream;
+        player.play();
+      };
+
+      videoBtn.onclick = async () => {
+        if (currentCameraStream) currentCameraStream.getTracks().forEach((t) => t.stop());
+
+        player.srcObject = null;
+        player.src = './video.mp4';
+
+        await new Promise((resolve) => {
+          player.onloadedmetadata = resolve;
+        });
+
+        player.play();
+      };
+
+      const micMeter = document.getElementById('micMeter');
+      const masterMeter = document.getElementById('masterMeter');
+
+      const micAnalyser = mixer.getMicAnalyser();
+      const masterAnalyser = mixer.getMasterAnalyser();
+
+      const micData = new Uint8Array(micAnalyser.frequencyBinCount);
+      const masterData = new Uint8Array(masterAnalyser.frequencyBinCount);
+
+      function updateMeters() {
+        const micLevel = mixer.getAudioLevel(mixer.getMicAnalyser());
+        const masterLevel = mixer.getAudioLevel(mixer.getMasterAnalyser());
+
+        document.getElementById('micMeter').value = micLevel;
+        document.getElementById('masterMeter').value = masterLevel;
+
+        requestAnimationFrame(updateMeters);
+      }
+
+      document.body.addEventListener(
+        'click',
+        () => {
+          mixer.resume();
+        },
+        { once: true },
+      );
+
+      updateMeters();
+
+      loadDevices();
+      mixer.unmuteMic();
+    </script>
+  </body>
+</html>
