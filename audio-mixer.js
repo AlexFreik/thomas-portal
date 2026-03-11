@@ -107,8 +107,10 @@ export class AudioMixer {
     }
     async setMasterSpeaker(deviceId) {
         const audio = this.masterAudio;
-        if (deviceId == 'none')
+        if (deviceId === 'none') {
             this.masterGain.gain.value = 0;
+            return;
+        }
         else
             this.masterGain.gain.value = 1;
         if (audio.setSinkId)
@@ -116,11 +118,13 @@ export class AudioMixer {
     }
     async setHeadphones(deviceId) {
         const audio = this.headphoneAudio;
-        if (deviceId == 'none')
-            this.masterGain.gain.value = 0;
+        if (deviceId === 'none') {
+            this.headphoneGain.gain.value = 0;
+            return;
+        }
         else
-            this.masterGain.gain.value = 1;
-        if (audio.setSinkId && deviceId !== 'none')
+            this.headphoneGain.gain.value = 1;
+        if (audio.setSinkId)
             await audio.setSinkId(deviceId);
     }
     getMicLevel() {
