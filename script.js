@@ -1,8 +1,11 @@
 import { AudioMixer, drawDbMeter } from './audio-mixer.js';
+import { setupObs } from './obs-setup.js';
 const mixer = new AudioMixer();
 const player = document.getElementById('player');
 mixer.attachMediaElement(player);
 const cameraPreview = document.getElementById('camera-preview');
+const micToggle = document.getElementById('mic-toggle');
+const micPreviewToggle = document.getElementById('mic-preview-toggle');
 const cameraSelect = document.getElementById('camera');
 const micSelect = document.getElementById('mic');
 const masterSelect = document.getElementById('master');
@@ -93,21 +96,48 @@ async function setHeadphones(id) {
     await mixer.setHeadphones(id);
     localStorage.setItem('selectedHeadphones', id);
 }
+function muteMic() {
+    mixer.muteMic();
+    micToggle.innerText = 'Off';
+}
+function unmuteMic() {
+    mixer.unmuteMic();
+    micToggle.innerText = 'On';
+}
+micToggle.onclick = () => {
+    if (micToggle.innerText === 'On')
+        muteMic();
+    else
+        unmuteMic();
+};
+micPreviewToggle.onclick = () => {
+    if (micPreviewToggle.innerText === 'On') {
+        mixer.previewMic(false);
+        micPreviewToggle.innerText = 'Off';
+    }
+    else {
+        mixer.previewMic(true);
+        micPreviewToggle.innerText = 'On';
+    }
+};
 cameraBtn.onclick = async () => {
     player.pause();
+    player.currentTime = 0;
     player.src = '';
     player.srcObject = currentCameraStream;
     await player.play();
-    mixer.unmuteMic();
+    unmuteMic();
 };
 videoBtn.onclick = async () => {
+    player.pause();
+    player.currentTime = 0;
     player.srcObject = null;
     player.src = './video.mp4';
     await new Promise((resolve) => {
         player.addEventListener('loadedmetadata', resolve, { once: true });
     });
     await player.play();
-    mixer.muteMic();
+    muteMic();
 };
 function updateMeters() {
     const masterLevel = mixer.getMasterLevel();
@@ -120,7 +150,7 @@ function updateMeters() {
     const micCanvas = document.querySelector('#mic-meter');
     const micCtx = micCanvas.getContext('2d');
     micCtx.clearRect(0, 0, 100, 100);
-    drawDbMeter(micCtx, 0, 100, micLevel, false);
+    drawDbMeter(micCtx, 0, 100, micLevel, mixer.isMicMuted());
     requestAnimationFrame(updateMeters);
 }
 document.body.addEventListener('click', () => {
@@ -139,5 +169,27 @@ navigator.mediaDevices.addEventListener('devicechange', async () => {
         }
     }
 });
+async function handleSetupObsClick() {
+    try {
+        const player = document.getElementById('player');
+        if (!player) {
+            throw new Error("Player element with id='player' not found.");
+        }
+        const rect = player.getBoundingClientRect();
+        const pageWidth = document.documentElement.clientWidth;
+        const pageHeight = document.documentElement.clientHeight;
+        const x1 = rect.left;
+        const y1 = rect.top;
+        const x2 = rect.right;
+        const y2 = rect.bottom;
+        await setupObs(pageWidth, pageHeight, x1, y1, x2, y2);
+        console.log('OBS setup completed');
+    }
+    catch (err) {
+        console.error('OBS setup failed:', err.message);
+        alert('OBS setup failed: ' + err.message);
+    }
+}
+document.getElementById('setupObsBtn')?.addEventListener('click', handleSetupObsClick);
 updateMeters();
 loadDevices();

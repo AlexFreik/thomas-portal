@@ -88,6 +88,9 @@ export class AudioMixer {
     unmuteMic() {
         this.micMuteGain.gain.value = 1;
     }
+    isMicMuted() {
+        return this.micMuteGain.gain.value === 0;
+    }
     previewMic(on) {
         if (on) {
             this.micToHeadphoneGain.gain.value = 1;

@@ -28,6 +28,8 @@
   <body>
     <h3>Audio Mixer Demo</h3>
 
+    <button id="setupObsBtn">Setup OBS</button>
+
     <div>
       Camera
       <select id="camera" style="width: 100px"></select>
@@ -35,6 +37,10 @@
 
       Mic
       <select id="mic" style="width: 100px"></select>
+      | Mic:
+      <button id="mic-toggle">Off</button>
+      | Preview:
+      <button id="mic-preview-toggle">Off</button>
       <br />
 
       Master Speaker
@@ -50,7 +56,7 @@
       <canvas id="mic-meter" style="width: 10px; height: 180px" width="100" height="100"></canvas>
     </div>
 
-    <video id="player" controls playsinline style="width: 640px; height: 360px; display: inline-block"></video>
+    <video id="player" controls playsinline style="width: 640px; height: 360px; display: inline-block" crossorigin="anonymous"></video>
     <canvas id="master-meter" style="width: 10px; height: 360px" width="100" height="100"></canvas>
 
     <div>
