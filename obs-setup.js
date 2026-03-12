@@ -1,63 +1,86 @@
-export async function setupObs(pageWidth, pageHeight, x1, y1, x2, y2) {
+export async function setupObs(pageWidth, x1, y1, x2) {
     const ws = new WebSocket('ws://127.0.0.1:4455');
+    let firstSceneName = null;
+    let firstSceneItemId = null;
+    function send(requestType, requestData = {}, requestId) {
+        ws.send(JSON.stringify({
+            op: 6,
+            d: {
+                requestType,
+                requestId,
+                requestData,
+            },
+        }));
+    }
     return new Promise((resolve, reject) => {
         ws.onerror = () => {
-            reject(new Error('Cannot connect to OBS WebSocket. Make sure OBS is running and WebSocket server is enabled.'));
+            reject(new Error('Cannot connect to OBS WebSocket'));
         };
         ws.onopen = () => {
-            // OBS v5 requires identify message
+            // Identify
             ws.send(JSON.stringify({
                 op: 1,
-                d: {
-                    rpcVersion: 1,
-                },
+                d: { rpcVersion: 1 },
             }));
         };
-        ws.onmessage = async (event) => {
+        ws.onmessage = (event) => {
             const msg = JSON.parse(event.data);
-            // After identify success
+            // Identify OK
             if (msg.op === 2) {
-                const playerWidth = x2 - x1;
-                const playerHeight = y2 - y1;
+                send('GetSceneList', {}, 'getScenes');
+            }
+            if (msg.op !== 7)
+                return;
+            const { requestId, responseData, requestStatus } = msg.d;
+            if (!requestStatus.result) {
+                reject(new Error(requestStatus.comment));
+                ws.close();
+                return;
+            }
+            // Scene list
+            if (requestId === 'getScenes') {
+                if (!responseData.scenes.length) {
+                    reject(new Error('OBS has no scenes'));
+                    ws.close();
+                    return;
+                }
+                firstSceneName = responseData.scenes[0].sceneName;
+                send('GetSceneItemList', {
+                    sceneName: firstSceneName,
+                }, 'getSceneItems');
+            }
+            // Scene items
+            if (requestId === 'getSceneItems') {
+                if (!responseData.sceneItems.length) {
+                    reject(new Error('First scene has no sources'));
+                    ws.close();
+                    return;
+                }
+                firstSceneItemId = responseData.sceneItems[0].sceneItemId;
                 const cropLeft = x1;
                 const cropTop = y1;
-                const cropRight = pageWidth - x2;
-                const cropBottom = pageHeight - y2;
-                const scaleX = pageWidth / playerWidth;
-                const scaleY = pageHeight / playerHeight;
-                // Request id
-                const requestId = 'set-transform';
-                ws.send(JSON.stringify({
-                    op: 6,
-                    d: {
-                        requestType: 'SetSceneItemTransform',
-                        requestId: requestId,
-                        requestData: {
-                            sceneName: 'Scene',
-                            sceneItemId: 1,
-                            sceneItemTransform: {
-                                cropLeft,
-                                cropRight,
-                                cropTop,
-                                cropBottom,
-                                scaleX,
-                                scaleY,
-                                positionX: 0,
-                                positionY: 0,
-                            },
-                        },
+                const cropRight = 0;
+                const cropBottom = 0;
+                const scaleX = pageWidth / (x2 - x1);
+                const scaleY = scaleX;
+                send('SetSceneItemTransform', {
+                    sceneName: firstSceneName,
+                    sceneItemId: firstSceneItemId,
+                    sceneItemTransform: {
+                        cropLeft,
+                        cropRight,
+                        cropTop,
+                        cropBottom,
+                        scaleX,
+                        scaleY,
+                        positionX: 0,
+                        positionY: 0,
                     },
-                }));
+                }, 'setTransform');
             }
-            // Request response
-            if (msg.op === 7) {
-                if (!msg.d.requestStatus.result) {
-                    reject(new Error('OBS error: ' + msg.d.requestStatus.comment));
-                }
-                else {
-                    resolve(true);
-                }
+            if (requestId === 'setTransform') {
                 ws.close();
+                resolve(true);
             }
         };
     });

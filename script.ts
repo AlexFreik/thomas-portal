@@ -221,18 +221,23 @@ async function handleSetupObsClick() {
         }
 
         const rect = player.getBoundingClientRect();
+        const bodyElem = document.querySelector('body') as HTMLBodyElement;
+        const bodyRect = bodyElem.getBoundingClientRect();
 
-        const pageWidth = document.documentElement.clientWidth;
-        const pageHeight = document.documentElement.clientHeight;
+        const pageWidth = screen.width;
+        const scale = window.devicePixelRatio;
 
-        const x1 = rect.left;
-        const y1 = rect.top;
-        const x2 = rect.right;
-        const y2 = rect.bottom;
+        const offsetX = window.screenX;
+        const offsetY = window.screenY + (window.outerHeight - bodyRect.height);
 
-        await setupObs(pageWidth, pageHeight, x1, y1, x2, y2);
+        const x1 = (rect.left + offsetX) * scale;
+        const y1 = (rect.top + offsetY) * scale;
+        const x2 = (rect.right + offsetX) * scale;
+
+        await setupObs(pageWidth, x1, y1, x2);
 
         console.log('OBS setup completed');
+        alert('OBS setup completed');
     } catch (err: any) {
         console.error('OBS setup failed:', err.message);
         alert('OBS setup failed: ' + err.message);
