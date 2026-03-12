@@ -2,6 +2,7 @@ import { AudioMixer, drawDbMeter } from './audio-mixer.js';
 const mixer = new AudioMixer();
 const player = document.getElementById('player');
 mixer.attachMediaElement(player);
+const cameraPreview = document.getElementById('camera-preview');
 const cameraSelect = document.getElementById('camera');
 const micSelect = document.getElementById('mic');
 const masterSelect = document.getElementById('master');
@@ -19,21 +20,22 @@ async function loadDevices() {
     fill(micSelect, mics);
     fill(masterSelect, outs, true);
     fill(headphonesSelect, outs, true);
+    const selectedCamera = localStorage.getItem('selectedCamera');
+    if (selectedCamera)
+        cameraSelect.value = selectedCamera;
+    setCamera(cameraSelect.value);
     const selectedMic = localStorage.getItem('selectedMic');
-    if (selectedMic) {
+    if (selectedMic)
         micSelect.value = selectedMic;
-        setMic(selectedMic);
-    }
+    setMic(micSelect.value);
     const selectedMaster = localStorage.getItem('selectedMaster');
-    if (selectedMaster) {
+    if (selectedMaster)
         masterSelect.value = selectedMaster;
-        setMasterSpeaker(selectedMaster);
-    }
+    setMasterSpeaker(masterSelect.value);
     const selectedHeadphones = localStorage.getItem('selectedHeadphones');
-    if (selectedHeadphones) {
+    if (selectedHeadphones)
         headphonesSelect.value = selectedHeadphones;
-        setHeadphones(selectedHeadphones);
-    }
+    setHeadphones(headphonesSelect.value);
 }
 function fill(select, devices, addNone = false) {
     select.innerHTML = '';
@@ -50,9 +52,29 @@ function fill(select, devices, addNone = false) {
         select.appendChild(opt);
     });
 }
+cameraSelect.onchange = () => setCamera(cameraSelect.value);
 micSelect.onchange = () => setMic(micSelect.value);
 masterSelect.onchange = () => setMasterSpeaker(masterSelect.value);
 headphonesSelect.onchange = () => setHeadphones(headphonesSelect.value);
+async function setCamera(id) {
+    if (!id)
+        return;
+    if (currentCameraStream) {
+        currentCameraStream.getTracks().forEach((track) => track.stop());
+    }
+    const stream = await navigator.mediaDevices.getUserMedia({
+        video: { deviceId: { exact: id } },
+        audio: false,
+    });
+    const track = stream.getVideoTracks()[0];
+    track.onended = () => {
+        console.log('Camera disconnected');
+    };
+    currentCameraStream = stream;
+    cameraPreview.srcObject = stream;
+    cameraPreview.play();
+    localStorage.setItem('selectedCamera', id);
+}
 async function setMic(id) {
     if (!id)
         return;
@@ -72,43 +94,50 @@ async function setHeadphones(id) {
     localStorage.setItem('selectedHeadphones', id);
 }
 cameraBtn.onclick = async () => {
-    if (currentCameraStream)
-        currentCameraStream.getTracks().forEach((t) => t.stop());
-    const camId = cameraSelect.value;
-    const stream = await navigator.mediaDevices.getUserMedia({
-        video: { deviceId: camId },
-        audio: false,
-    });
-    currentCameraStream = stream;
-    player.srcObject = stream;
-    player.play();
+    player.pause();
+    player.src = '';
+    player.srcObject = currentCameraStream;
+    await player.play();
     mixer.unmuteMic();
 };
 videoBtn.onclick = async () => {
-    if (currentCameraStream)
-        currentCameraStream.getTracks().forEach((t) => t.stop());
     player.srcObject = null;
     player.src = './video.mp4';
     await new Promise((resolve) => {
-        player.onloadedmetadata = resolve;
+        player.addEventListener('loadedmetadata', resolve, { once: true });
     });
-    player.play();
+    await player.play();
     mixer.muteMic();
 };
 function updateMeters() {
     const masterLevel = mixer.getMasterLevel();
-    const canvas = document.querySelector('#master-meter');
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, 100, 100);
-    drawDbMeter(ctx, 0, masterLevel, false);
-    drawDbMeter(ctx, 52, masterLevel, false);
+    const masterCanvas = document.querySelector('#master-meter');
+    const masterCtx = masterCanvas.getContext('2d');
+    masterCtx.clearRect(0, 0, 100, 100);
+    drawDbMeter(masterCtx, 0, 48, masterLevel, false);
+    drawDbMeter(masterCtx, 54, 48, masterLevel, false);
     const micLevel = mixer.getMicLevel();
-    const micMeter = document.getElementById('micMeter');
-    micMeter.value = Math.min(1, micLevel * 3);
+    const micCanvas = document.querySelector('#mic-meter');
+    const micCtx = micCanvas.getContext('2d');
+    micCtx.clearRect(0, 0, 100, 100);
+    drawDbMeter(micCtx, 0, 100, micLevel, false);
     requestAnimationFrame(updateMeters);
 }
 document.body.addEventListener('click', () => {
     mixer.resume();
 }, { once: true });
+// Detect if camera is unplugged
+navigator.mediaDevices.addEventListener('devicechange', async () => {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const cameras = devices.filter((d) => d.kind === 'videoinput');
+    const stillExists = cameras.some((d) => d.deviceId === cameraSelect.value);
+    if (!stillExists) {
+        console.log('Selected camera disconnected');
+        if (cameras.length > 0) {
+            setCamera(cameras[0].deviceId);
+            cameraSelect.value = cameras[0].deviceId;
+        }
+    }
+});
 updateMeters();
 loadDevices();

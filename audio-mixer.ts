@@ -1,36 +1,25 @@
 /*
-
-    ===== VIDEO ELEMENT =====
-            │
-            ▼
-    createMediaElementSource
-            │
-            ▼
-        videoGain ← video channel
-        │     │
-        │     └────────► headphoneGain → headphoneDest → headphones device
-        ▼
-    masterGain
-        │
-        ▼
-    masterAnalyser
-        │
-        ▼
-    masterDest
-        │
-        ▼
-    masterAudio → speaker device
-
-
-    ===== MIC INPUT =====
-            │
-            ▼
-        micSource → stereoMic → micGain → micAnalyser
-                                            │
-                                            ├→ headphoneGain → ...
-                                            ▼
-                                            masterGain → ...
-    */
+   ===== VIDEO ELEMENT =====              ===== MIC INPUT =====
+            │                                       │
+            ▼                                       ▼
+    createMediaElementSource                    micSource
+            │                                       │
+            ▼                                       ▼
+        videoGain                   ┌─────────  micGain → micAnalizer
+        │      │                    │               │
+        │   videoToHeadphoneGain    │      micToHeadhponesGain
+        │      │                    │               │       
+        │      └────────────────────────────────┐   │           
+        ▼                           │           ▼   ▼   
+    masterGain <─── micMuteGain ────┘        headphoneGain
+     │     │                                       │
+     │     ▼                                       ▼
+     ▼   masterAnalyser                     headphoneDest → headphones device
+ masterDest
+     │
+     ▼                   
+ masterAudio → speaker device
+ */
 
 export class AudioMixer {
     private ctx: AudioContext;
@@ -43,9 +32,13 @@ export class AudioMixer {
     private headphoneDest: MediaStreamAudioDestinationNode;
 
     private micGain: GainNode;
+    private micMuteGain: GainNode;
     private videoGain: GainNode;
     private masterGain: GainNode;
+
     private headphoneGain: GainNode;
+    private micToHeadphoneGain: GainNode;
+    private videoToHeadphoneGain: GainNode;
 
     private micAnalyser: AnalyserNode;
     private masterAnalyser: AnalyserNode;
@@ -53,13 +46,14 @@ export class AudioMixer {
     private masterAudio: HTMLAudioElement;
     private headphoneAudio: HTMLAudioElement;
 
-    private micMonitorEnabled = false;
-
     constructor() {
         this.ctx = new AudioContext();
 
         this.micGain = this.ctx.createGain();
-        this.micGain.gain.value = 0;
+        this.micGain.gain.value = 1;
+
+        this.micMuteGain = this.ctx.createGain();
+        this.micMuteGain.gain.value = 0;
 
         this.videoGain = this.ctx.createGain();
         this.videoGain.gain.value = 1;
@@ -69,6 +63,12 @@ export class AudioMixer {
 
         this.headphoneGain = this.ctx.createGain();
         this.headphoneGain.gain.value = 1;
+
+        this.micToHeadphoneGain = this.ctx.createGain();
+        this.micToHeadphoneGain.gain.value = 0;
+
+        this.videoToHeadphoneGain = this.ctx.createGain();
+        this.videoToHeadphoneGain.gain.value = 1;
 
         this.micAnalyser = this.ctx.createAnalyser();
         this.masterAnalyser = this.ctx.createAnalyser();
@@ -94,11 +94,16 @@ export class AudioMixer {
         this.masterAudio.play().catch(() => {});
         this.headphoneAudio.play().catch(() => {});
 
+        // Routing
         this.micGain.connect(this.micAnalyser);
-        this.micAnalyser.connect(this.masterGain);
+        this.micGain.connect(this.micMuteGain);
+        this.micMuteGain.connect(this.masterGain);
+        this.micGain.connect(this.micToHeadphoneGain);
+        this.micToHeadphoneGain.connect(this.headphoneGain);
 
         this.videoGain.connect(this.masterGain);
-        this.videoGain.connect(this.headphoneGain);
+        this.videoGain.connect(this.videoToHeadphoneGain);
+        this.videoToHeadphoneGain.connect(this.headphoneGain);
 
         this.masterGain.connect(this.masterAnalyser);
         this.masterAnalyser.connect(this.masterDest);
@@ -125,24 +130,20 @@ export class AudioMixer {
     }
 
     muteMic() {
-        this.micGain.gain.value = 0;
+        this.micMuteGain.gain.value = 0;
     }
 
     unmuteMic() {
-        this.micGain.gain.value = 1;
+        this.micMuteGain.gain.value = 1;
     }
 
-    setMicMonitor(enabled: boolean) {
-        this.micMonitorEnabled = enabled;
-
-        if (!this.micAnalyser) return;
-
-        try {
-            this.micAnalyser.disconnect(this.headphoneGain);
-        } catch {}
-
-        if (enabled) {
-            this.micAnalyser.connect(this.headphoneGain);
+    previewMic(on: boolean) {
+        if (on) {
+            this.micToHeadphoneGain.gain.value = 1;
+            this.videoToHeadphoneGain.gain.value = 0;
+        } else {
+            this.micToHeadphoneGain.gain.value = 0;
+            this.videoToHeadphoneGain.gain.value = 1;
         }
     }
 
@@ -175,38 +176,11 @@ export class AudioMixer {
     }
 
     getMicLevel() {
-        return this.getAudioLevel(this.micAnalyser);
+        return getAudioLevel(this.micAnalyser);
     }
 
     getMasterLevel() {
-        return this.getAudioLevel(this.masterAnalyser);
-    }
-
-    async listDevices() {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-
-        return {
-            cameras: devices.filter((d) => d.kind === 'videoinput'),
-            mics: devices.filter((d) => d.kind === 'audioinput'),
-            speakers: devices.filter((d) => d.kind === 'audiooutput'),
-        };
-    }
-
-    getAudioLevel(analyser: AnalyserNode): number {
-        const data = new Uint8Array(analyser.fftSize);
-
-        analyser.getByteTimeDomainData(data);
-
-        let sum = 0;
-
-        for (let i = 0; i < data.length; i++) {
-            const v = (data[i] - 128) / 128;
-            sum += v * v;
-        }
-
-        const rms = Math.sqrt(sum / data.length);
-
-        return rms;
+        return getAudioLevel(this.masterAnalyser);
     }
 
     async resume() {
@@ -228,6 +202,8 @@ export class AudioMixer {
     }
 }
 
+// ===== Utility Functions =====
+
 function forceMonoToStereo(audioContext: AudioContext, sourceNode: AudioNode) {
     const splitter = audioContext.createChannelSplitter(2);
     const merger = audioContext.createChannelMerger(2);
@@ -241,6 +217,23 @@ function forceMonoToStereo(audioContext: AudioContext, sourceNode: AudioNode) {
     return merger;
 }
 
+function getAudioLevel(analyser: AnalyserNode): number {
+    const data = new Uint8Array(analyser.fftSize);
+
+    analyser.getByteTimeDomainData(data);
+
+    let sum = 0;
+
+    for (let i = 0; i < data.length; i++) {
+        const v = (data[i] - 128) / 128;
+        sum += v * v;
+    }
+
+    const rms = Math.sqrt(sum / data.length);
+
+    return rms;
+}
+
 // =====
 // ===== Audio Meter =====
 // =====
@@ -249,6 +242,7 @@ function forceMonoToStereo(audioContext: AudioContext, sourceNode: AudioNode) {
 export function drawDbMeter(
     ctx: CanvasRenderingContext2D,
     xOffset: number,
+    xWidth: number,
     volume: number,
     muted: boolean,
 ) {
@@ -280,7 +274,7 @@ export function drawDbMeter(
             ctx.fillRect(
                 xOffset,
                 canvasHeight - accumulatedHeight - filledHeight,
-                50,
+                xWidth,
                 filledHeight,
             );
             accumulatedHeight += rangeHeight;

@@ -2,16 +2,18 @@ import { AudioMixer, drawDbMeter } from './audio-mixer.js';
 
 const mixer = new AudioMixer();
 
-const player: any = document.getElementById('player');
+const player = document.getElementById('player') as HTMLVideoElement;
 mixer.attachMediaElement(player);
 
-const cameraSelect: any = document.getElementById('camera');
-const micSelect: any = document.getElementById('mic');
-const masterSelect: any = document.getElementById('master');
-const headphonesSelect: any = document.getElementById('headphones');
+const cameraPreview = document.getElementById('camera-preview') as HTMLVideoElement;
 
-const cameraBtn: any = document.getElementById('cameraBtn');
-const videoBtn: any = document.getElementById('videoBtn');
+const cameraSelect = document.getElementById('camera') as HTMLSelectElement;
+const micSelect = document.getElementById('mic') as HTMLSelectElement;
+const masterSelect = document.getElementById('master') as HTMLSelectElement;
+const headphonesSelect = document.getElementById('headphones') as HTMLSelectElement;
+
+const cameraBtn = document.getElementById('cameraBtn') as HTMLButtonElement;
+const videoBtn = document.getElementById('videoBtn') as HTMLButtonElement;
 
 let currentCameraStream: MediaStream | null = null;
 
@@ -29,26 +31,24 @@ async function loadDevices() {
     fill(masterSelect, outs, true);
     fill(headphonesSelect, outs, true);
 
+    const selectedCamera = localStorage.getItem('selectedCamera');
+    if (selectedCamera) cameraSelect.value = selectedCamera;
+    setCamera(cameraSelect.value);
+
     const selectedMic = localStorage.getItem('selectedMic');
-    if (selectedMic) {
-        micSelect.value = selectedMic;
-        setMic(selectedMic);
-    }
+    if (selectedMic) micSelect.value = selectedMic;
+    setMic(micSelect.value);
 
     const selectedMaster = localStorage.getItem('selectedMaster');
-    if (selectedMaster) {
-        masterSelect.value = selectedMaster;
-        setMasterSpeaker(selectedMaster);
-    }
+    if (selectedMaster) masterSelect.value = selectedMaster;
+    setMasterSpeaker(masterSelect.value);
 
     const selectedHeadphones = localStorage.getItem('selectedHeadphones');
-    if (selectedHeadphones) {
-        headphonesSelect.value = selectedHeadphones;
-        setHeadphones(selectedHeadphones);
-    }
+    if (selectedHeadphones) headphonesSelect.value = selectedHeadphones;
+    setHeadphones(headphonesSelect.value);
 }
 
-function fill(select: any, devices: any[], addNone = false) {
+function fill(select: HTMLSelectElement, devices: any[], addNone = false) {
     select.innerHTML = '';
 
     if (addNone) {
@@ -67,9 +67,34 @@ function fill(select: any, devices: any[], addNone = false) {
     });
 }
 
+cameraSelect.onchange = () => setCamera(cameraSelect.value);
 micSelect.onchange = () => setMic(micSelect.value);
 masterSelect.onchange = () => setMasterSpeaker(masterSelect.value);
 headphonesSelect.onchange = () => setHeadphones(headphonesSelect.value);
+
+async function setCamera(id: string) {
+    if (!id) return;
+
+    if (currentCameraStream) {
+        currentCameraStream.getTracks().forEach((track) => track.stop());
+    }
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+        video: { deviceId: { exact: id } },
+        audio: false,
+    });
+    const track = stream.getVideoTracks()[0];
+
+    track.onended = () => {
+        console.log('Camera disconnected');
+    };
+
+    currentCameraStream = stream;
+
+    cameraPreview.srcObject = stream;
+    cameraPreview.play();
+    localStorage.setItem('selectedCamera', id);
+}
 
 async function setMic(id: string) {
     if (!id) return;
@@ -90,47 +115,40 @@ async function setHeadphones(id: string) {
 }
 
 cameraBtn.onclick = async () => {
-    if (currentCameraStream) currentCameraStream.getTracks().forEach((t) => t.stop());
+    player.pause();
 
-    const camId = cameraSelect.value;
+    player.src = '';
+    player.srcObject = currentCameraStream;
 
-    const stream = await navigator.mediaDevices.getUserMedia({
-        video: { deviceId: camId },
-        audio: false,
-    });
-
-    currentCameraStream = stream;
-
-    player.srcObject = stream;
-    player.play();
+    await player.play();
     mixer.unmuteMic();
 };
 
 videoBtn.onclick = async () => {
-    if (currentCameraStream) currentCameraStream.getTracks().forEach((t) => t.stop());
-
     player.srcObject = null;
     player.src = './video.mp4';
 
     await new Promise((resolve) => {
-        player.onloadedmetadata = resolve;
+        player.addEventListener('loadedmetadata', resolve, { once: true });
     });
 
-    player.play();
+    await player.play();
     mixer.muteMic();
 };
 
 function updateMeters() {
     const masterLevel = mixer.getMasterLevel();
-    const canvas = document.querySelector('#master-meter') as HTMLCanvasElement;
-    const ctx = canvas.getContext('2d')!;
-    ctx.clearRect(0, 0, 100, 100);
-    drawDbMeter(ctx, 0, masterLevel, false);
-    drawDbMeter(ctx, 52, masterLevel, false);
+    const masterCanvas = document.querySelector('#master-meter') as HTMLCanvasElement;
+    const masterCtx = masterCanvas.getContext('2d')!;
+    masterCtx.clearRect(0, 0, 100, 100);
+    drawDbMeter(masterCtx, 0, 48, masterLevel, false);
+    drawDbMeter(masterCtx, 54, 48, masterLevel, false);
 
     const micLevel = mixer.getMicLevel();
-    const micMeter = document.getElementById('micMeter') as HTMLMeterElement;
-    micMeter.value = Math.min(1, micLevel * 3);
+    const micCanvas = document.querySelector('#mic-meter') as HTMLCanvasElement;
+    const micCtx = micCanvas.getContext('2d')!;
+    micCtx.clearRect(0, 0, 100, 100);
+    drawDbMeter(micCtx, 0, 100, micLevel, false);
 
     requestAnimationFrame(updateMeters);
 }
@@ -142,6 +160,24 @@ document.body.addEventListener(
     },
     { once: true },
 );
+
+// Detect if camera is unplugged
+navigator.mediaDevices.addEventListener('devicechange', async () => {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+
+    const cameras = devices.filter((d) => d.kind === 'videoinput');
+
+    const stillExists = cameras.some((d) => d.deviceId === cameraSelect.value);
+
+    if (!stillExists) {
+        console.log('Selected camera disconnected');
+
+        if (cameras.length > 0) {
+            setCamera(cameras[0].deviceId);
+            cameraSelect.value = cameras[0].deviceId;
+        }
+    }
+});
 
 updateMeters();
 
