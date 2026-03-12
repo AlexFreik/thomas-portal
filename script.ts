@@ -237,7 +237,6 @@ async function handleSetupObsClick() {
         await setupObs(pageWidth, x1, y1, x2);
 
         console.log('OBS setup completed');
-        alert('OBS setup completed');
     } catch (err: any) {
         console.error('OBS setup failed:', err.message);
         alert('OBS setup failed: ' + err.message);
@@ -245,6 +244,19 @@ async function handleSetupObsClick() {
 }
 
 document.getElementById('setupObsBtn')?.addEventListener('click', handleSetupObsClick);
+
+const gainSlider = document.getElementById('mic-gain') as HTMLInputElement;
+const gainLabel = document.getElementById('mic-gain-label') as HTMLSpanElement;
+
+gainSlider.addEventListener('input', () => {
+    const value = parseInt(gainSlider.value);
+    let gain = value / 100;
+    if (gain > 1) gain = (gain - 1) * 4 + 1;
+
+    gainLabel.textContent = Math.round(gain * 100) + '%';
+
+    mixer.setMicGain(gain);
+});
 
 updateMeters();
 

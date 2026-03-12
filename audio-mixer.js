@@ -82,6 +82,10 @@ export class AudioMixer {
         this.stereoMic = forceMonoToStereo(this.ctx, this.micSource);
         this.stereoMic.connect(this.micGain);
     }
+    setMicGain(gain) {
+        console.assert(gain >= 0 && gain <= 5, gain);
+        this.micGain.gain.value = Math.max(0, Math.min(gain, 5));
+    }
     muteMic() {
         this.micMuteGain.gain.value = 0;
     }

@@ -83,6 +83,11 @@
           <video id="camera-preview" playsinline class="aspect-video bg-black h-[150px] rounded-lg"></video>
 
           <canvas id="mic-meter" class="bg-base-300 rounded w-[20px]" width="100" height="100"></canvas>
+
+          <div class="inline-flex flex-col items-center text-center">
+            <input id="mic-gain" type="range" min="0" max="200" value="100" style="direction: rtl" class="[writing-mode:vertical-lr] w-4" />
+            <span class="text-xs mt-1 w-[30px]" id="mic-gain-label">100%</span>
+          </div>
         </div>
       </div>
     </div>
