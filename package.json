@@ -8,6 +8,7 @@
         "watch": "tsc --watch --watchFile fixedpollinginterval",
         "serve": "npx serve -l 8000",
         "pretty": "prettier --write .",
+        "css": "npx @tailwindcss/cli -i ./input.css -o ./output.css",
         "test": "echo \"Error: no test specified\" && exit 1"
     },
     "repository": {
@@ -19,7 +20,11 @@
     "license": "ISC",
     "type": "commonjs",
     "devDependencies": {
+        "@tailwindcss/cli": "^4.2.1",
+        "daisyui": "^5.5.19",
         "prettier": "^3.8.1",
+        "prettier-plugin-tailwindcss": "^0.7.2",
+        "tailwindcss": "^4.2.1",
         "typescript": "^5.9.3"
     }
 }

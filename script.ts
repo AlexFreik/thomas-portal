@@ -120,26 +120,26 @@ async function setHeadphones(id: string) {
 
 function muteMic() {
     mixer.muteMic();
-    micToggle.innerText = 'Off';
+    micToggle.innerText = 'Muted';
 }
 
 function unmuteMic() {
     mixer.unmuteMic();
-    micToggle.innerText = 'On';
+    micToggle.innerText = 'Unmuted';
 }
 
 micToggle.onclick = () => {
-    if (micToggle.innerText === 'On') muteMic();
+    if (micToggle.innerText === 'Unmuted') muteMic();
     else unmuteMic();
 };
 
 micPreviewToggle.onclick = () => {
-    if (micPreviewToggle.innerText === 'On') {
+    if (micPreviewToggle.innerText === 'Preview On') {
         mixer.previewMic(false);
-        micPreviewToggle.innerText = 'Off';
+        micPreviewToggle.innerText = 'Preview Off';
     } else {
         mixer.previewMic(true);
-        micPreviewToggle.innerText = 'On';
+        micPreviewToggle.innerText = 'Preview On';
     }
 };
 
