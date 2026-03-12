@@ -251,7 +251,7 @@ const gainLabel = document.getElementById('mic-gain-label') as HTMLSpanElement;
 gainSlider.addEventListener('input', () => {
     const value = parseInt(gainSlider.value);
     let gain = value / 100;
-    if (gain > 1) gain = (gain - 1) * 4 + 1;
+    if (gain > 1) gain = (gain - 1) * 5 + 1;
 
     gainLabel.textContent = Math.round(gain * 100) + '%';
 

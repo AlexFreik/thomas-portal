@@ -83,7 +83,7 @@ export class AudioMixer {
         this.stereoMic.connect(this.micGain);
     }
     setMicGain(gain) {
-        console.assert(gain >= 0 && gain <= 5, gain);
+        console.assert(gain >= 0 && gain <= 6, gain);
         this.micGain.gain.value = Math.max(0, Math.min(gain, 5));
     }
     muteMic() {
