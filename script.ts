@@ -159,7 +159,7 @@ videoBtn.onclick = async () => {
     player.currentTime = 0;
 
     player.srcObject = null;
-    player.src = './video.mp4';
+    player.src = './video1.mp4';
 
     await new Promise((resolve) => {
         player.addEventListener('loadedmetadata', resolve, { once: true });
