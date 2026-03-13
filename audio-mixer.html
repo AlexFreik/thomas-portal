@@ -16,7 +16,10 @@
       <div id="leftPanel" class="w-[500px] bg-base-100 p-6 flex flex-col gap-6 overflow-auto">
         <h2 class="text-xl font-bold">Thomas Portal Demo</h2>
 
-        <button id="setupObsBtn" class="btn btn-primary btn-sm w-fit">Setup OBS</button>
+        <div class="flex gap-2">
+          <button id="setupObsBtn" class="btn btn-primary btn-sm w-fit">Setup OBS</button>
+          <button id="fullscreenBtn" class="btn btn-sm w-fit">Full Screen</button>
+        </div>
 
         <!-- Camera -->
         <div class="form-control">
@@ -33,11 +36,6 @@
           </label>
 
           <select id="mic" class="select select-bordered select-sm w-full"></select>
-
-          <div class="flex gap-2 mt-2">
-            <button id="mic-toggle" class="btn btn-sm">Muted</button>
-            <button id="mic-preview-toggle" class="btn btn-sm">Preview Off</button>
-          </div>
         </div>
 
         <!-- Master -->
@@ -87,6 +85,25 @@
           <div class="inline-flex flex-col items-center text-center">
             <input id="mic-gain" type="range" min="0" max="200" value="100" style="direction: rtl" class="[writing-mode:vertical-lr] w-4" />
             <span class="text-xs mt-1 w-[30px]" id="mic-gain-label">100%</span>
+          </div>
+
+          <!-- Toggle buttons -->
+          <div class="flex flex-col gap-2">
+            <!-- Mic mute -->
+            <label class="swap btn btn-sm btn-outline w-20">
+              <input id="mic-toggle" type="checkbox" checked />
+
+              <span class="swap-on">🎤</span>
+              <span class="swap-off">❌🎤</span>
+            </label>
+
+            <!-- Mic preview -->
+            <label class="swap btn btn-sm btn-outline w-20">
+              <input id="mic-preview-toggle" type="checkbox" />
+
+              <span class="swap-on">🎧</span>
+              <span class="swap-off">❌🎧</span>
+            </label>
           </div>
         </div>
       </div>

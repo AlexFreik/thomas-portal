@@ -1,4 +1,4 @@
-export async function setupObs(pageWidth: number, x1: number, y1: number, x2: number) {
+export async function setupObs(element: HTMLElement) {
     const ws = new WebSocket('ws://127.0.0.1:4455');
 
     let firstSceneName = null as any;
@@ -79,29 +79,12 @@ export async function setupObs(pageWidth: number, x1: number, y1: number, x2: nu
 
                 firstSceneItemId = responseData.sceneItems[0].sceneItemId;
 
-                const cropLeft = x1;
-                const cropTop = y1;
-                const cropRight = 0;
-                const cropBottom = 0;
-
-                const scaleX = pageWidth / (x2 - x1);
-                const scaleY = scaleX;
-
                 send(
                     'SetSceneItemTransform',
                     {
                         sceneName: firstSceneName,
                         sceneItemId: firstSceneItemId,
-                        sceneItemTransform: {
-                            cropLeft,
-                            cropRight,
-                            cropTop,
-                            cropBottom,
-                            scaleX,
-                            scaleY,
-                            positionX: 0,
-                            positionY: 0,
-                        },
+                        sceneItemTransform: calculateTransformation(element),
                     },
                     'setTransform',
                 );
@@ -113,4 +96,39 @@ export async function setupObs(pageWidth: number, x1: number, y1: number, x2: nu
             }
         };
     });
+}
+
+function calculateTransformation(element: HTMLElement) {
+    const rect = element.getBoundingClientRect();
+    const bodyElem = document.querySelector('body') as HTMLBodyElement;
+    const bodyRect = bodyElem.getBoundingClientRect();
+
+    const pageWidth = screen.width;
+    const scale = window.devicePixelRatio;
+
+    const offsetX = window.screenX;
+    const offsetY = window.screenY + (window.outerHeight - bodyRect.height);
+
+    const x1 = (rect.left + offsetX) * scale;
+    const y1 = (rect.top + offsetY) * scale;
+    const x2 = (rect.right + offsetX) * scale;
+
+    const cropLeft = x1;
+    const cropTop = y1;
+    const cropRight = 0;
+    const cropBottom = 0;
+
+    const scaleX = pageWidth / (x2 - x1);
+    const scaleY = scaleX;
+
+    return {
+        cropLeft,
+        cropRight,
+        cropTop,
+        cropBottom,
+        scaleX,
+        scaleY,
+        positionX: 0,
+        positionY: 0,
+    };
 }
