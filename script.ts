@@ -209,9 +209,9 @@ navigator.mediaDevices.addEventListener('devicechange', async () => {
 
 async function handleSetupObsClick() {
     try {
-        await setupObs(player);
+        await setupObs(player, 'Scene');
     } catch (err: any) {
-        console.error('OBS setup failed:', err.message);
+        console.error('OBS setup failed:', err);
         alert('OBS setup failed: ' + err.message);
     }
 }

@@ -1,20 +1,11 @@
-export async function setupObs(element: HTMLElement) {
+export async function setupObs(element: HTMLElement, sceneName: string) {
     const ws = new WebSocket('ws://127.0.0.1:4455');
 
-    let firstSceneName = null as any;
-    let firstSceneItemId = null as any;
+    let windowCaptureSourceId = null as string | null;
+    let detectedWindowId = null as string | null;
 
     function send(requestType: any, requestData = {}, requestId: any) {
-        ws.send(
-            JSON.stringify({
-                op: 6,
-                d: {
-                    requestType,
-                    requestId,
-                    requestData,
-                },
-            }),
-        );
+        ws.send(JSON.stringify({ op: 6, d: { requestType, requestId, requestData } }));
     }
 
     return new Promise((resolve, reject) => {
@@ -24,21 +15,14 @@ export async function setupObs(element: HTMLElement) {
 
         ws.onopen = () => {
             // Identify
-            ws.send(
-                JSON.stringify({
-                    op: 1,
-                    d: { rpcVersion: 1 },
-                }),
-            );
+            ws.send(JSON.stringify({ op: 1, d: { rpcVersion: 1 } }));
         };
 
         ws.onmessage = (event) => {
             const msg = JSON.parse(event.data);
 
             // Identify OK
-            if (msg.op === 2) {
-                send('GetSceneList', {}, 'getScenes');
-            }
+            if (msg.op === 2) send('GetSceneList', {}, 'getScenes');
 
             if (msg.op !== 7) return;
 
@@ -50,40 +34,81 @@ export async function setupObs(element: HTMLElement) {
                 return;
             }
 
+            // send(
+            //     'GetInputPropertiesListPropertyItems',
+            //     { inputKind: 'window_capture', propertyName: 'window' },
+            //     'getWindowList');
+
+            // // Window List
+            // if (requestId === 'getWindowList') {
+            //     const portalWindow = responseData.propertyItems.find(
+            //         (item: any) => item.itemName.includes(sceneName)
+            //     );
+
+            //     detectedWindowId = portalWindow ? portalWindow.itemValue : null;
+
+            //     send('GetSceneList', {}, 'getScenes');
+            // }
+
             // Scene list
             if (requestId === 'getScenes') {
-                if (!responseData.scenes.length) {
-                    reject(new Error('OBS has no scenes'));
-                    ws.close();
-                    return;
-                }
-
-                firstSceneName = responseData.scenes[0].sceneName;
-
-                send(
-                    'GetSceneItemList',
-                    {
-                        sceneName: firstSceneName,
-                    },
-                    'getSceneItems',
+                const portalScene = responseData.scenes.find(
+                    (scene: any) => scene.sceneName === sceneName,
                 );
+
+                if (portalScene) {
+                    send('GetSceneItemList', { sceneName: sceneName }, 'getSceneItems');
+                } else {
+                    send('CreateScene', { sceneName: sceneName }, 'createNewScene');
+                }
+            }
+
+            if (requestId === 'createNewScene') {
+                send('GetSceneItemList', { sceneName: sceneName }, 'getSceneItems');
             }
 
             // Scene items
             if (requestId === 'getSceneItems') {
-                if (!responseData.sceneItems.length) {
-                    reject(new Error('First scene has no sources'));
-                    ws.close();
-                    return;
+                console.log(responseData);
+                const windowCapture = responseData.sceneItems.find(
+                    (item: any) => item.sourceName === 'Window Capture',
+                );
+
+                if (windowCapture) {
+                    windowCaptureSourceId = windowCapture.sceneItemId;
+
+                    send(
+                        'SetSceneItemTransform',
+                        {
+                            sceneName: sceneName,
+                            sceneItemId: windowCaptureSourceId,
+                            sceneItemTransform: calculateTransformation(element),
+                        },
+                        'setTransform',
+                    );
+                } else {
+                    // Create Window Capture source
+                    // TODO: automatically select window
+                    send(
+                        'CreateInput',
+                        {
+                            sceneName: sceneName,
+                            inputName: sceneName + ' Window Capture',
+                            inputKind: 'window_capture',
+                            inputSettings: { capture_method: 'automatic' },
+                            sceneItemEnabled: true,
+                        },
+                        'createWindowCapture',
+                    );
                 }
+            }
 
-                firstSceneItemId = responseData.sceneItems[0].sceneItemId;
-
+            if (requestId === 'createWindowCapture') {
                 send(
                     'SetSceneItemTransform',
                     {
-                        sceneName: firstSceneName,
-                        sceneItemId: firstSceneItemId,
+                        sceneName: sceneName,
+                        sceneItemId: responseData.inputUuid,
                         sceneItemTransform: calculateTransformation(element),
                     },
                     'setTransform',
