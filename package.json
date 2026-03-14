@@ -2,11 +2,12 @@
     "name": "thomas-portal",
     "version": "1.0.0",
     "description": "",
-    "main": "index.js",
+    "main": "dist/main.js",
     "scripts": {
-        "build": "tsc",
-        "watch": "tsc --watch --watchFile fixedpollinginterval",
-        "serve": "npx serve -l 8000",
+        "start": "electron .",
+        "build": "tsc -p tsconfig.main.json && tsc -p tsconfig.renderer.json",
+        "watch:main": "tsc -w -p tsconfig.main.json",
+        "watch:renderer": "tsc -w -p tsconfig.renderer.json",
         "pretty": "prettier --write .",
         "css": "npx @tailwindcss/cli -i ./input.css -o ./output.css",
         "test": "echo \"Error: no test specified\" && exit 1"
@@ -21,10 +22,15 @@
     "type": "commonjs",
     "devDependencies": {
         "@tailwindcss/cli": "^4.2.1",
+        "@types/node": "^25.5.0",
         "daisyui": "^5.5.19",
+        "electron": "^41.0.2",
         "prettier": "^3.8.1",
         "prettier-plugin-tailwindcss": "^0.7.2",
         "tailwindcss": "^4.2.1",
         "typescript": "^5.9.3"
+    },
+    "dependencies": {
+        "obs-websocket-js": "^5.0.7"
     }
 }

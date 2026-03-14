@@ -16,8 +16,6 @@ npm run pretty
 
 ## Run
 
-Run this to start the server, it will run on the port `8000` by default.
-
 ```sh
-npm run serve
+npm start
 ```

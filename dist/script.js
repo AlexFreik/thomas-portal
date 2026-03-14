@@ -1,5 +1,4 @@
 import { AudioMixer, drawDbMeter } from './audio-mixer.js';
-import { setupObs } from './obs-setup.js';
 const mixer = new AudioMixer();
 const player = document.getElementById('player');
 mixer.attachMediaElement(player);
@@ -164,9 +163,39 @@ navigator.mediaDevices.addEventListener('devicechange', async () => {
         }
     }
 });
+function calculateObsTransformation(element) {
+    const rect = element.getBoundingClientRect();
+    const bodyElem = document.querySelector('body');
+    const bodyRect = bodyElem.getBoundingClientRect();
+    const pageWidth = screen.width;
+    const scale = window.devicePixelRatio;
+    const offsetX = window.screenX;
+    const offsetY = window.screenY + (window.outerHeight - bodyRect.height);
+    const x1 = (rect.left + offsetX) * scale;
+    const y1 = (rect.top + offsetY) * scale;
+    const x2 = (rect.right + offsetX) * scale;
+    const cropLeft = x1;
+    const cropTop = y1;
+    const cropRight = 0;
+    const cropBottom = 0;
+    const scaleX = pageWidth / (x2 - x1);
+    const scaleY = scaleX;
+    return {
+        cropLeft,
+        cropRight,
+        cropTop,
+        cropBottom,
+        scaleX,
+        scaleY,
+        positionX: 0,
+        positionY: 0,
+    };
+}
+let autoSetupObs = false;
 async function handleSetupObsClick() {
     try {
-        await setupObs(player, 'Scene');
+        await window.electronAPI.setupObs(calculateObsTransformation(player), 'Scene');
+        autoSetupObs = true;
     }
     catch (err) {
         console.error('OBS setup failed:', err);
@@ -199,7 +228,8 @@ let dragging = false;
 divider.addEventListener('mousedown', () => (dragging = true));
 document.addEventListener('mouseup', () => {
     dragging = false;
-    handleSetupObsClick();
+    if (autoSetupObs)
+        handleSetupObsClick();
 });
 document.addEventListener('mousemove', (e) => {
     if (!dragging)
