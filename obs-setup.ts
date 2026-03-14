@@ -69,7 +69,6 @@ export async function setupObs(element: HTMLElement, sceneName: string) {
 
             // Scene items
             if (requestId === 'getSceneItems') {
-                console.log(responseData);
                 const windowCapture = responseData.sceneItems.find(
                     (item: any) => item.sourceName === 'Window Capture',
                 );

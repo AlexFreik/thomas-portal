@@ -193,5 +193,19 @@ fullscreenBtn.onclick = () => {
         document.documentElement.requestFullscreen();
     }
 };
+const divider = document.getElementById('divider');
+const leftPanel = document.getElementById('leftPanel');
+let dragging = false;
+divider.addEventListener('mousedown', () => (dragging = true));
+document.addEventListener('mouseup', () => {
+    dragging = false;
+    handleSetupObsClick();
+});
+document.addEventListener('mousemove', (e) => {
+    if (!dragging)
+        return;
+    const newWidth = e.clientX;
+    leftPanel.style.width = newWidth + 'px';
+});
 updateMeters();
 loadDevices();

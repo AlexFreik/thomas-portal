@@ -241,6 +241,25 @@ fullscreenBtn.onclick = () => {
     }
 };
 
+const divider = document.getElementById('divider') as HTMLElement;
+const leftPanel = document.getElementById('leftPanel') as HTMLElement;
+
+let dragging = false;
+
+divider.addEventListener('mousedown', () => (dragging = true));
+
+document.addEventListener('mouseup', () => {
+    dragging = false;
+    handleSetupObsClick();
+});
+
+document.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+
+    const newWidth = e.clientX;
+    leftPanel.style.width = newWidth + 'px';
+});
+
 updateMeters();
 
 loadDevices();
