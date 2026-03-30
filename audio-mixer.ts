@@ -21,6 +21,9 @@
  masterAudio → speaker device
  */
 
+const BUFF_SIZE = 64;
+const SMOOTHING_TIME = 0.8;
+
 export class AudioMixer {
     private ctx: AudioContext;
 
@@ -73,8 +76,11 @@ export class AudioMixer {
         this.micAnalyser = this.ctx.createAnalyser();
         this.masterAnalyser = this.ctx.createAnalyser();
 
-        this.micAnalyser.fftSize = 256;
-        this.masterAnalyser.fftSize = 256;
+        this.micAnalyser.fftSize = BUFF_SIZE * 2;
+        this.masterAnalyser.fftSize = BUFF_SIZE * 2;
+
+        this.micAnalyser.smoothingTimeConstant = SMOOTHING_TIME;
+        this.masterAnalyser.smoothingTimeConstant = SMOOTHING_TIME;
 
         this.masterDest = this.ctx.createMediaStreamDestination();
         this.headphoneDest = this.ctx.createMediaStreamDestination();
@@ -227,20 +233,17 @@ function forceMonoToStereo(audioContext: AudioContext, sourceNode: AudioNode) {
 }
 
 function getAudioLevel(analyser: AnalyserNode): number {
-    const data = new Uint8Array(analyser.fftSize);
+    const data = new Float32Array(analyser.fftSize);
 
-    analyser.getByteTimeDomainData(data);
+    analyser.getFloatTimeDomainData(data);
 
     let sum = 0;
-
     for (let i = 0; i < data.length; i++) {
-        const v = (data[i] - 128) / 128;
-        sum += v * v;
+        sum += data[i] ** 2;
     }
-
-    const rms = Math.sqrt(sum / data.length);
-
-    return rms;
+    const rms = Math.sqrt(sum / data.length) * 2.3; // Apply gain
+    const dB = 20 * Math.log10(rms + 1e-10); // Avoid log(0) error
+    return Math.min(0, dB);
 }
 
 // =====
@@ -249,15 +252,25 @@ function getAudioLevel(analyser: AnalyserNode): number {
 
 // Draw the segmented dB meter with peak indicator
 export function drawDbMeter(
-    ctx: CanvasRenderingContext2D,
-    xOffset: number,
-    xWidth: number,
-    volume: number,
+    canvas: HTMLCanvasElement,
+    leftDb: number,
+    rightdB: number,
     muted: boolean,
 ) {
-    const dB = Math.max(-100, Math.min(0, Math.log10(volume) * 20));
-    const canvasHeight = 100;
+    const ctx = canvas.getContext('2d')!;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+    drawDbMeterHelper(canvas, ctx, true, leftDb, muted);
+    drawDbMeterHelper(canvas, ctx, false, rightdB, muted);
+}
+
+function drawDbMeterHelper(
+    canvas: HTMLCanvasElement,
+    ctx: CanvasRenderingContext2D,
+    isLeft: boolean,
+    dB: number,
+    muted: boolean,
+) {
     // Define dB ranges and colors
     const dbRanges = [
         { min: -100, max: -90, frac: 0.07, colorOn: '#008000', colorOff: '#008080' },
@@ -272,7 +285,7 @@ export function drawDbMeter(
 
     dbRanges.forEach((range) => {
         if (dB >= range.min) {
-            const rangeHeight = range.frac * canvasHeight;
+            const rangeHeight = range.frac * canvas.height;
 
             // Calculate the portion of this range to be filled
             const filledFraction = Math.min(dB, range.max) - range.min;
@@ -281,9 +294,9 @@ export function drawDbMeter(
             // Draw the segment for this range
             ctx.fillStyle = muted ? range.colorOff : range.colorOn;
             ctx.fillRect(
-                xOffset,
-                canvasHeight - accumulatedHeight - filledHeight,
-                xWidth,
+                (isLeft ? 0 : 0.55) * canvas.width,
+                canvas.height - accumulatedHeight - filledHeight,
+                0.45 * canvas.width,
                 filledHeight,
             );
             accumulatedHeight += rangeHeight;

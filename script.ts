@@ -26,8 +26,6 @@ const videoBtn = document.getElementById('videoBtn') as HTMLButtonElement;
 let currentCameraStream: MediaStream | null = null;
 
 async function loadDevices() {
-    await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-
     const devices = await navigator.mediaDevices.enumerateDevices();
 
     const cams = devices.filter((d) => d.kind === 'videoinput');
@@ -41,7 +39,7 @@ async function loadDevices() {
 
     const selectedCamera = localStorage.getItem('selectedCamera');
     if (selectedCamera) cameraSelect.value = selectedCamera;
-    setCamera(cameraSelect.value);
+    await setCamera(cameraSelect.value);
 
     const selectedMic = localStorage.getItem('selectedMic');
     if (selectedMic) micSelect.value = selectedMic;
@@ -87,21 +85,26 @@ async function setCamera(id: string) {
         currentCameraStream.getTracks().forEach((track) => track.stop());
     }
 
-    const stream = await navigator.mediaDevices.getUserMedia({
-        video: { deviceId: { exact: id } },
-        audio: false,
-    });
-    const track = stream.getVideoTracks()[0];
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: { deviceId: { exact: id } },
+            audio: false,
+        });
 
-    track.onended = () => {
-        console.log('Camera disconnected');
-    };
+        const track = stream.getVideoTracks()[0];
 
-    currentCameraStream = stream;
+        track.onended = () => {
+            console.log('Camera disconnected');
+        };
 
-    cameraPreview.srcObject = stream;
-    cameraPreview.play();
-    localStorage.setItem('selectedCamera', id);
+        currentCameraStream = stream;
+
+        cameraPreview.srcObject = stream;
+        cameraPreview.play();
+        localStorage.setItem('selectedCamera', id);
+    } catch (err) {
+        alert(err);
+    }
 }
 
 async function setMic(id: string) {
@@ -174,16 +177,11 @@ videoBtn.onclick = async () => {
 function updateMeters() {
     const masterLevel = mixer.getMasterLevel();
     const masterCanvas = document.querySelector('#master-meter') as HTMLCanvasElement;
-    const masterCtx = masterCanvas.getContext('2d')!;
-    masterCtx.clearRect(0, 0, 100, 100);
-    drawDbMeter(masterCtx, 0, 48, masterLevel, false);
-    drawDbMeter(masterCtx, 54, 48, masterLevel, false);
+    drawDbMeter(masterCanvas, masterLevel, masterLevel, false);
 
     const micLevel = mixer.getMicLevel();
     const micCanvas = document.querySelector('#mic-meter') as HTMLCanvasElement;
-    const micCtx = micCanvas.getContext('2d')!;
-    micCtx.clearRect(0, 0, 100, 100);
-    drawDbMeter(micCtx, 0, 100, micLevel, mixer.isMicMuted());
+    drawDbMeter(micCanvas, micLevel, micLevel, mixer.isMicMuted());
 
     requestAnimationFrame(updateMeters);
 }
