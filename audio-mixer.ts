@@ -171,7 +171,7 @@ export class AudioMixer {
     async setMasterSpeaker(deviceId: string) {
         const audio = this.masterAudio as any;
 
-        if (deviceId === 'none') {
+        if (deviceId === '') {
             this.masterGain.gain.value = 0;
             return;
         } else this.masterGain.gain.value = 1;
@@ -182,7 +182,7 @@ export class AudioMixer {
     async setHeadphones(deviceId: string) {
         const audio = this.headphoneAudio as any;
 
-        if (deviceId === 'none') {
+        if (deviceId === '') {
             this.headphoneGain.gain.value = 0;
             return;
         } else this.headphoneGain.gain.value = 1;

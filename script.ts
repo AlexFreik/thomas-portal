@@ -59,7 +59,7 @@ function fill(select: HTMLSelectElement, devices: any[], addNone = false) {
 
     if (addNone) {
         const opt = document.createElement('option');
-        opt.value = 'none';
+        opt.value = '';
         opt.text = 'None';
         select.appendChild(opt);
     }
@@ -108,19 +108,16 @@ async function setCamera(id: string) {
 }
 
 async function setMic(id: string) {
-    if (!id) return;
     await mixer.startMic(id);
     localStorage.setItem('selectedMic', id);
 }
 
 async function setMasterSpeaker(id: string) {
-    if (!id) return;
     await mixer.setMasterSpeaker(id);
     localStorage.setItem('selectedMaster', id);
 }
 
 async function setHeadphones(id: string) {
-    if (!id) return;
     await mixer.setHeadphones(id);
     localStorage.setItem('selectedHeadphones', id);
 }
