@@ -13,7 +13,7 @@ npm run build
 ## Code Format
 
 ```sh
-npm run pretty
+npm run format
 ```
 
 ## Run

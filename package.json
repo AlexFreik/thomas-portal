@@ -8,7 +8,7 @@
         "build": "tsc -p tsconfig.main.json && tsc -p tsconfig.renderer.json",
         "watch:main": "tsc -w -p tsconfig.main.json",
         "watch:renderer": "tsc -w -p tsconfig.renderer.json",
-        "pretty": "prettier --write .",
+        "format": "prettier --write .",
         "css": "npx @tailwindcss/cli -i ./input.css -o ./output.css",
         "test": "echo \"Error: no test specified\" && exit 1"
     },

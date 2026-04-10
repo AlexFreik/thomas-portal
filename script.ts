@@ -172,15 +172,19 @@ videoBtn.onclick = async () => {
 };
 
 function updateMeters() {
-    const masterLevel = mixer.getMasterLevel();
+    const [masterLeftLevel, masterRightLevel] = mixer.getMasterLevel();
     const masterCanvas = document.querySelector('#master-meter') as HTMLCanvasElement;
-    drawDbMeter(masterCanvas, masterLevel, masterLevel, false);
+    drawDbMeter(masterCanvas, masterLeftLevel, masterRightLevel, false);
 
-    const micLevel = mixer.getMicLevel();
+    const [micLeftLevel, micRightLevel] = mixer.getMicLevel();
     const micCanvas = document.querySelector('#mic-meter') as HTMLCanvasElement;
-    drawDbMeter(micCanvas, micLevel, micLevel, mixer.isMicMuted());
+    drawDbMeter(micCanvas, micLeftLevel, micRightLevel, mixer.isMicMuted());
 
-    requestAnimationFrame(updateMeters);
+    const [videoLeftLevel, videoRightLevel] = mixer.getVideoLevel();
+    const videoCanvas = document.querySelector('#video-meter') as HTMLCanvasElement;
+    drawDbMeter(videoCanvas, videoLeftLevel, videoRightLevel, false);
+
+    setTimeout(() => requestAnimationFrame(updateMeters), 100);
 }
 
 document.body.addEventListener(
@@ -257,17 +261,27 @@ async function handleSetupObsClick() {
 
 document.getElementById('setupObsBtn')?.addEventListener('click', handleSetupObsClick);
 
-const gainSlider = document.getElementById('mic-gain') as HTMLInputElement;
-const gainLabel = document.getElementById('mic-gain-label') as HTMLSpanElement;
-
-gainSlider.addEventListener('input', () => {
-    const value = parseInt(gainSlider.value);
-    let gain = value / 100;
+function sliderPercentToGain(sliderValue: number) {
+    let gain = sliderValue / 100;
     if (gain > 1) gain = (gain - 1) * 5 + 1;
+    return gain;
+}
 
-    gainLabel.textContent = Math.round(gain * 100) + '%';
+const micGainSlider = document.getElementById('mic-gain') as HTMLInputElement;
+const micGainLabel = document.getElementById('mic-gain-label') as HTMLSpanElement;
+const videoGainSlider = document.getElementById('video-gain') as HTMLInputElement;
+const videoGainLabel = document.getElementById('video-gain-label') as HTMLSpanElement;
 
+micGainSlider.addEventListener('input', () => {
+    const gain = sliderPercentToGain(parseInt(micGainSlider.value));
+    micGainLabel.textContent = Math.round(gain * 100) + '%';
     mixer.setMicGain(gain);
+});
+
+videoGainSlider.addEventListener('input', () => {
+    const gain = sliderPercentToGain(parseInt(videoGainSlider.value));
+    videoGainLabel.textContent = Math.round(gain * 100) + '%';
+    mixer.setVideoGain(gain);
 });
 
 const fullscreenBtn = document.getElementById('fullscreenBtn') as HTMLButtonElement;

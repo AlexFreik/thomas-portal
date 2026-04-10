@@ -29,7 +29,8 @@ export class AudioMixer {
 
     private videoSource?: MediaElementAudioSourceNode;
     private micSource?: MediaStreamAudioSourceNode;
-    private stereoMic?: ChannelMergerNode;
+    private micInput: GainNode;
+    private stereoMic: ChannelMergerNode;
 
     private masterDest: MediaStreamAudioDestinationNode;
     private headphoneDest: MediaStreamAudioDestinationNode;
@@ -44,7 +45,10 @@ export class AudioMixer {
     private videoToHeadphoneGain: GainNode;
 
     private micAnalyser: AnalyserNode;
-    private masterAnalyser: AnalyserNode;
+    private videoAnalyserL: AnalyserNode;
+    private videoAnalyserR: AnalyserNode;
+    private masterAnalyserL: AnalyserNode;
+    private masterAnalyserR: AnalyserNode;
 
     private masterAudio: HTMLAudioElement;
     private headphoneAudio: HTMLAudioElement;
@@ -54,6 +58,9 @@ export class AudioMixer {
 
         this.micGain = this.ctx.createGain();
         this.micGain.gain.value = 1;
+
+        this.micInput = this.ctx.createGain();
+        this.micInput.gain.value = 1;
 
         this.micMuteGain = this.ctx.createGain();
         this.micMuteGain.gain.value = 0;
@@ -74,13 +81,22 @@ export class AudioMixer {
         this.videoToHeadphoneGain.gain.value = 1;
 
         this.micAnalyser = this.ctx.createAnalyser();
-        this.masterAnalyser = this.ctx.createAnalyser();
+        this.videoAnalyserL = this.ctx.createAnalyser();
+        this.videoAnalyserR = this.ctx.createAnalyser();
+        this.masterAnalyserL = this.ctx.createAnalyser();
+        this.masterAnalyserR = this.ctx.createAnalyser();
 
         this.micAnalyser.fftSize = BUFF_SIZE * 2;
-        this.masterAnalyser.fftSize = BUFF_SIZE * 2;
+        this.videoAnalyserL.fftSize = BUFF_SIZE * 2;
+        this.videoAnalyserR.fftSize = BUFF_SIZE * 2;
+        this.masterAnalyserL.fftSize = BUFF_SIZE * 2;
+        this.masterAnalyserR.fftSize = BUFF_SIZE * 2;
 
         this.micAnalyser.smoothingTimeConstant = SMOOTHING_TIME;
-        this.masterAnalyser.smoothingTimeConstant = SMOOTHING_TIME;
+        this.videoAnalyserL.smoothingTimeConstant = SMOOTHING_TIME;
+        this.videoAnalyserR.smoothingTimeConstant = SMOOTHING_TIME;
+        this.masterAnalyserL.smoothingTimeConstant = SMOOTHING_TIME;
+        this.masterAnalyserR.smoothingTimeConstant = SMOOTHING_TIME;
 
         this.masterDest = this.ctx.createMediaStreamDestination();
         this.headphoneDest = this.ctx.createMediaStreamDestination();
@@ -101,18 +117,32 @@ export class AudioMixer {
         this.headphoneAudio.play().catch(() => {});
 
         // Routing
+        const micInputSplitter = this.ctx.createChannelSplitter(2);
+        this.stereoMic = this.ctx.createChannelMerger(2);
+        this.micInput.connect(micInputSplitter);
+        micInputSplitter.connect(this.stereoMic, 0, 0);
+        micInputSplitter.connect(this.stereoMic, 0, 1);
+        this.stereoMic.connect(this.micGain);
+
         this.micGain.connect(this.micAnalyser);
         this.micGain.connect(this.micMuteGain);
         this.micMuteGain.connect(this.masterGain);
         this.micGain.connect(this.micToHeadphoneGain);
         this.micToHeadphoneGain.connect(this.headphoneGain);
 
+        const videoSplitter = this.ctx.createChannelSplitter(2);
+        this.videoGain.connect(videoSplitter);
+        videoSplitter.connect(this.videoAnalyserL, 0);
+        videoSplitter.connect(this.videoAnalyserR, 1);
         this.videoGain.connect(this.masterGain);
         this.videoGain.connect(this.videoToHeadphoneGain);
         this.videoToHeadphoneGain.connect(this.headphoneGain);
 
-        this.masterGain.connect(this.masterAnalyser);
-        this.masterAnalyser.connect(this.masterDest);
+        const masterSplitter = this.ctx.createChannelSplitter(2);
+        this.masterGain.connect(masterSplitter);
+        masterSplitter.connect(this.masterAnalyserL, 0);
+        masterSplitter.connect(this.masterAnalyserR, 1);
+        this.masterGain.connect(this.masterDest);
         this.headphoneGain.connect(this.headphoneDest);
     }
 
@@ -130,14 +160,27 @@ export class AudioMixer {
             audio: { deviceId },
         });
 
+        this.micSource?.disconnect();
         this.micSource = this.ctx.createMediaStreamSource(stream);
-        this.stereoMic = forceMonoToStereo(this.ctx, this.micSource);
-        this.stereoMic.connect(this.micGain);
+        this.micSource.connect(this.micInput);
     }
 
     setMicGain(gain: number) {
         console.assert(gain >= 0 && gain <= 6, gain);
-        this.micGain.gain.value = Math.max(0, Math.min(gain, 5));
+        this.micGain.gain.value = Math.max(0, Math.min(gain, 6));
+    }
+
+    setVideoGain(gain: number) {
+        console.assert(gain >= 0 && gain <= 6, gain);
+        this.videoGain.gain.value = Math.max(0, Math.min(gain, 6));
+    }
+
+    getVideoGain() {
+        return this.videoGain.gain.value;
+    }
+
+    getVideoLevel() {
+        return getAudioLevel(this.videoAnalyserL, this.videoAnalyserR);
     }
 
     muteMic() {
@@ -191,11 +234,11 @@ export class AudioMixer {
     }
 
     getMicLevel() {
-        return getAudioLevel(this.micAnalyser);
+        return getAudioLevel(this.micAnalyser, this.micAnalyser);
     }
 
     getMasterLevel() {
-        return getAudioLevel(this.masterAnalyser);
+        return getAudioLevel(this.masterAnalyserL, this.masterAnalyserR);
     }
 
     async resume() {
@@ -219,24 +262,19 @@ export class AudioMixer {
 
 // ===== Utility Functions =====
 
-function forceMonoToStereo(audioContext: AudioContext, sourceNode: AudioNode) {
-    const splitter = audioContext.createChannelSplitter(2);
-    const merger = audioContext.createChannelMerger(2);
+function getAudioLevel(analyserL: AnalyserNode, analyserR: AnalyserNode): [number, number] {
+    const dataL = new Float32Array(analyserL.fftSize);
+    const dataR = new Float32Array(analyserR.fftSize);
 
-    sourceNode.connect(splitter);
+    analyserL.getFloatTimeDomainData(dataL);
+    analyserR.getFloatTimeDomainData(dataR);
 
-    // duplicate channel 0 to L and R
-    splitter.connect(merger, 0, 0);
-    splitter.connect(merger, 0, 1);
-
-    return merger;
+    const leftDb = getDbFromTimeData(dataL);
+    const rightDb = getDbFromTimeData(dataR);
+    return [leftDb, rightDb];
 }
 
-function getAudioLevel(analyser: AnalyserNode): number {
-    const data = new Float32Array(analyser.fftSize);
-
-    analyser.getFloatTimeDomainData(data);
-
+function getDbFromTimeData(data: Float32Array): number {
     let sum = 0;
     for (let i = 0; i < data.length; i++) {
         sum += data[i] ** 2;
