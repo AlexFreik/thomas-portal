@@ -1,11 +1,11 @@
 /*
-   ===== VIDEO ELEMENT =====              ===== MIC INPUT =====
+   ===== VIDEO ELEMENT =====              ===== MIC SOURCE =====
+            │                                       │ 
+            ▼                                       ▼ (force stereo)
+    createMediaElementSource                    micInput
             │                                       │
             ▼                                       ▼
-    createMediaElementSource                    micSource
-            │                                       │
-            ▼                                       ▼
-        videoGain                   ┌─────────  micGain → micAnalizer
+        videoGain → analyser L/R    ┌─────────  micGain → analyser L/R
         │      │                    │               │
         │   videoToHeadphoneGain    │      micToHeadhponesGain
         │      │                    │               │       
@@ -14,11 +14,10 @@
     masterGain <─── micMuteGain ────┘        headphoneGain
      │     │                                       │
      │     ▼                                       ▼
-     ▼   masterAnalyser                     headphoneDest → headphones device
- masterDest
+     │   analyser L/R                       headphoneDest → headphones device
      │
      ▼                   
- masterAudio → speaker device
+ masterDest → speaker device
  */
 
 const BUFF_SIZE = 64;
