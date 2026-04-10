@@ -24,6 +24,7 @@ const cameraBtn = document.getElementById('cameraBtn') as HTMLButtonElement;
 const videoBtn = document.getElementById('videoBtn') as HTMLButtonElement;
 
 let currentCameraStream: MediaStream | null = null;
+let mainCameraStream: MediaStream | null = null;
 
 async function loadDevices() {
     const devices = await navigator.mediaDevices.enumerateDevices();
@@ -126,11 +127,11 @@ const micToggle = document.getElementById('mic-toggle') as HTMLInputElement;
 const micPreviewToggle = document.getElementById('mic-preview-toggle') as HTMLInputElement;
 
 function muteMic() {
-    if (!micToggle.checked) micToggle.click();
+    if (micToggle.checked) micToggle.click();
 }
 
 function unmuteMic() {
-    if (micToggle.checked) micToggle.click();
+    if (!micToggle.checked) micToggle.click();
 }
 
 micToggle.addEventListener('change', () => {
@@ -146,13 +147,33 @@ micPreviewToggle.addEventListener('change', () => {
 });
 
 cameraBtn.onclick = async () => {
-    player.pause();
-    player.currentTime = 0;
+    const id = cameraSelect.value;
+    if (!id) return;
 
-    player.src = '';
-    player.srcObject = currentCameraStream;
+    if (mainCameraStream) {
+        mainCameraStream.getTracks().forEach((track) => track.stop());
+    }
 
-    await player.play();
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: { deviceId: { exact: id } },
+            audio: false,
+        });
+
+        const track = stream.getVideoTracks()[0];
+
+        track.onended = () => {
+            console.log('Camera disconnected');
+        };
+
+        mainCameraStream = stream;
+
+        player.srcObject = stream;
+        player.play();
+        localStorage.setItem('selectedCamera', id);
+    } catch (err) {
+        alert(err);
+    }
     unmuteMic();
 };
 
